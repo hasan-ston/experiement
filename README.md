@@ -15,6 +15,17 @@ Full-stack sample showing a Flask API with Redis caching and a React dashboard f
 3) Flow
 - Register or log in, add expenses, optionally click "Import mock transactions" to simulate bank syncing. Category summary is cached in Redis.
 
+## Deploying with Redis (Render backend + Vercel frontend)
+1) Provision Redis on Render: “New +” → “Redis” → create instance → copy the `REDIS_URL`.
+2) Backend on Render:
+   - Create a Web Service pointing to `backend/app.py`.
+   - Set env vars: `REDIS_URL` (from step 1), `DATABASE_URL` (Postgres URI), `SECRET_KEY`, `JWT_SECRET_KEY`.
+   - Build/run command: `pip install -r backend/requirements.txt && cd backend && gunicorn app:app`.
+3) Frontend on Vercel:
+   - Deploy from `frontend/`.
+   - Set `VITE_API_BASE` to your Render backend URL.
+4) Sanity check: after deploy, hit `/healthz`. Then log in, create expenses, call `/api/expenses/summary` twice—you should see faster responses on repeat calls if Redis is reachable.
+
 ## Backend architecture (kept beginner-friendly)
 - Single Flask app factory (`backend/app.py`) that wires blueprints, JWT auth, Redis caching, and CORS in one place.
 - Modules: `routes/` (auth, expenses, imports), `services/` (cache helper, mock bank client), `models.py` (User, Expense), `config.py` (env settings).
@@ -37,7 +48,7 @@ Full-stack sample showing a Flask API with Redis caching and a React dashboard f
 - `POST /api/expenses` `{category, description?, amount}` (auth)
 - `GET /api/expenses` (auth) recent list
 - `GET /api/expenses/summary` (auth, cached)
-- `POST /api/imports/mock` (auth) simulate bank transaction import
+- `GET /api/expenses/insights` (auth, AI; requires `OPENAI_API_KEY`)
 
 ## Frontend
 - Vite + React (`frontend/src/App.jsx`) with a dark dashboard: auth, expense entry, mock import, category pie, and recent expenses table.
