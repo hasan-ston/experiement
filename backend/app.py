@@ -21,7 +21,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 app = Flask(__name__) # Creating flask instance
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///finance.db")
+_db_url = os.getenv("DATABASE_URL", "sqlite:///finance.db")
+if _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["REDIS_URL"] = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 app.config["RATELIMIT_STORAGE_URI"] = os.getenv("RATELIMIT_STORAGE_URI", app.config["REDIS_URL"])
