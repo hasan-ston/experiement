@@ -14,6 +14,7 @@ from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
 import json
 import google.generativeai as genai
+from openai import OpenAI
 import redis
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -41,15 +42,25 @@ limiter = Limiter(
     default_limits=["200 per hour"],
 )
 
-# Initialize Google Gemini
+# Initialize AI providers
 gemini_model = None
-if os.getenv("GEMINI_API_KEY"):
+openai_client = None
+_gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if _gemini_api_key:
     try:
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-        print("Gemini AI initialized successfully")
-    except Exception as e:
-        print(f"Gemini initialization error: {e}")
+        genai.configure(api_key=_gemini_api_key)
+        gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+        app.logger.info("Gemini AI initialized")
+    except Exception as exc:
+        app.logger.error("Gemini initialization error: %s", exc)
+
+_openai_api_key = os.getenv("OPENAI_API_KEY")
+if _openai_api_key:
+    try:
+        openai_client = OpenAI(api_key=_openai_api_key)
+        app.logger.info("OpenAI client initialized")
+    except Exception as exc:
+        app.logger.error("OpenAI initialization error: %s", exc)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
@@ -185,36 +196,12 @@ def expense_insights():
     
     if not summary_list:
         return jsonify({"insight": "Add some expenses to get insights.", "summary": []})
-    
-    if not gemini_model:
-        return jsonify({
-            "insight": "AI insights temporarily unavailable. Here's your spending summary:",
-            "summary": summary_list
-        })
 
-    try:
-        prompt = (
-            "You are a concise finance assistant. Given category totals, provide 3 short, practical insights. "
-            "Avoid jargon. Keep it brief and actionable. Data: "
-            + "; ".join(f"{item['category']}: ${item['total']:.2f}" for item in summary_list)
-        )
-        
-        print(f"Making Gemini request for user {user_id}")
-        
-        response = gemini_model.generate_content(prompt)
-        insight_text = response.text.strip()
-        
-        return jsonify({"insight": insight_text, "summary": summary_list})
-        
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Gemini API error: {error_msg}")
-        
-        # Fallback: return summary without AI insights
-        return jsonify({
-            "insight": "AI insights temporarily unavailable. Your spending summary is shown below.",
-            "summary": summary_list
-        })
+    insight_text, warning = _generate_insight(summary_list)
+    response_body = {"insight": insight_text, "summary": summary_list}
+    if warning:
+        response_body["warning"] = warning
+    return jsonify(response_body)
 
 
 @app.get("/healthz")
@@ -266,6 +253,77 @@ def _invalidate_summary_cache(user_id: int):
         redis_client.delete(f"summary:{user_id}")
     except Exception:
         pass
+
+
+def _generate_insight(summary_list):
+    """Try Gemini, then OpenAI; fall back to heuristics."""
+    prompt = (
+        "You are a concise finance assistant. Given category totals, provide 3 short, practical insights. "
+        "Avoid jargon. Keep it brief and actionable. Data: "
+        + "; ".join(f"{item['category']}: ${item['total']:.2f}" for item in summary_list)
+    )
+
+    errors = []
+
+    if gemini_model:
+        try:
+            resp = gemini_model.generate_content(prompt)
+            text = (resp.text or "").strip()
+            if text:
+                return text, None
+            errors.append("Gemini returned empty text")
+        except Exception as exc:
+            app.logger.exception("Gemini insight generation failed")
+            errors.append(f"Gemini error: {exc}")
+
+    if openai_client:
+        try:
+            resp = openai_client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                messages=[
+                    {"role": "system", "content": "Keep responses brief and actionable."},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=180,
+                temperature=0.4,
+            )
+            text = resp.choices[0].message.content.strip()
+            if text:
+                return text, None
+            errors.append("OpenAI returned empty text")
+        except Exception as exc:
+            app.logger.exception("OpenAI insight generation failed")
+            errors.append(f"OpenAI error: {exc}")
+
+    fallback = _fallback_insight(summary_list)
+    warning = (
+        "; ".join(errors)
+        if errors
+        else "AI insights unavailable; showing a quick heuristic summary instead."
+    )
+    return fallback, warning
+
+
+def _fallback_insight(summary_list):
+    if not summary_list:
+        return "Add expenses to get a spending readout."
+    sorted_list = sorted(summary_list, key=lambda x: x["total"], reverse=True)
+    top = sorted_list[0]
+    total_spend = sum(item["total"] for item in summary_list) or 1
+    top_share = (top["total"] / total_spend) * 100
+
+    tips = [
+        f"Your biggest category is {top['category']} at {top_share:.0f}% of spend.",
+        "Set a weekly cap for that category and check back after a few entries.",
+    ]
+
+    if len(sorted_list) > 1:
+        second = sorted_list[1]
+        tips.append(f"Next up: {second['category']} ({second['total']:.2f}). Consider trimming 5-10% there.")
+    else:
+        tips.append("Add more categories to see a fuller picture.")
+
+    return " ".join(tips)
 
 
 if __name__ == "__main__":
