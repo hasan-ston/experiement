@@ -11,6 +11,7 @@ export default function App() {
   const [summary, setSummary] = useState([]);
   const [form, setForm] = useState({ email: "", password: "" });
   const [expenseForm, setExpenseForm] = useState({ category: "groceries", description: "", amount: "" });
+  const [insight, setInsight] = useState("");
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -30,9 +31,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setStatus(data.error || "Auth failed");
+        const message =
+          endpoint === "register" && res.status === 409
+            ? "Email already exists. Try logging in instead."
+            : data.error || "Auth failed";
+        setStatus(message);
         return;
       }
       setToken(data.access_token);
@@ -77,20 +82,23 @@ export default function App() {
     fetchSummary();
   }
 
-  async function handleImport() {
-    setStatus("Importing mock transactions...");
-    const res = await fetch(`${API_BASE}/api/imports/mock`, {
-      method: "POST",
-      headers: { ...authHeaders },
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setStatus(data.error || "Import failed");
-      return;
+  async function fetchInsights() {
+    setStatus("Fetching AI insights...");
+    setInsight("");
+    try {
+      const res = await fetch(`${API_BASE}/api/expenses/insights`, {
+        headers: { ...authHeaders },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus(data.error || "Could not fetch insights");
+        return;
+      }
+      setInsight(data.insight || "No insight returned.");
+      setStatus("AI insight ready");
+    } catch (err) {
+      setStatus("Cannot reach API. Is the backend running on 5000?");
     }
-    setStatus(`Imported ${data.imported} transactions`);
-    fetchExpenses();
-    fetchSummary();
   }
 
   function logout() {
@@ -99,6 +107,7 @@ export default function App() {
     localStorage.removeItem("token");
     setExpenses([]);
     setSummary([]);
+    setInsight("");
   }
 
   const total = summary.reduce((sum, item) => sum + item.total, 0);
@@ -109,7 +118,7 @@ export default function App() {
         <div>
           <p className="eyebrow">Personal Finance</p>
           <h1>Expense dashboard</h1>
-          <p className="subhead">Track spending, import transactions, and view category trends.</p>
+          <p className="subhead">Track spending, get AI tips, and view category trends.</p>
         </div>
         <div className="status">{status}</div>
       </header>
@@ -155,9 +164,6 @@ export default function App() {
                 <input type="number" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="12.50" />
                 <button type="submit">Add expense</button>
               </form>
-              <button className="secondary full" onClick={handleImport}>
-                Import mock transactions
-              </button>
             </div>
 
             <div className="card">
@@ -192,6 +198,16 @@ export default function App() {
                   </div>
                 </div>
               )}
+              <div className="insight-panel">
+                <div>
+                  <p className="eyebrow">AI helper</p>
+                  <p className="muted">Get a quick read on your spending.</p>
+                </div>
+                <button className="secondary" onClick={fetchInsights}>
+                  Get AI insight
+                </button>
+              </div>
+              {insight && <p className="insight-text">{insight}</p>}
             </div>
           </section>
 
@@ -222,5 +238,4 @@ export default function App() {
       )}
     </div>
   );
-
 }

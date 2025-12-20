@@ -127,6 +127,12 @@ button:active {
   transform: translateY(1px);
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .actions {
   display: flex;
   gap: 8px;
@@ -197,6 +203,27 @@ button:active {
 
 .total {
   color: var(--muted);
+}
+
+.insight-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background: #0f172a;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.insight-panel .eyebrow {
+  margin: 0;
+}
+
+.insight-text {
+  margin: 10px 0 0;
+  line-height: 1.5;
 }
 
 @media (max-width: 800px) {

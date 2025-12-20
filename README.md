@@ -13,7 +13,7 @@ Full-stack sample showing a Flask API with Redis caching and a React dashboard f
 - `npm run dev` (Vite) then open the printed URL.
 
 3) Flow
-- Register or log in, add expenses, optionally click "Import mock transactions" to simulate bank syncing. Category summary is cached in Redis.
+- Register or log in, add expenses, and pull AI spending tips once you have some data. Category summary is cached in Redis.
 
 ## Deploying with Redis (Render backend + Vercel frontend)
 1) Provision Redis on Render: “New +” → “Redis” → create instance → copy the `REDIS_URL`.
@@ -51,7 +51,7 @@ Full-stack sample showing a Flask API with Redis caching and a React dashboard f
 - `GET /api/expenses/insights` (auth, AI; requires `OPENAI_API_KEY`)
 
 ## Frontend
-- Vite + React (`frontend/src/App.jsx`) with a dark dashboard: auth, expense entry, mock import, category pie, and recent expenses table.
+- Vite + React (`frontend/src/App.jsx`) with a dark dashboard: auth, expense entry, AI insight button, category pie, and recent expenses table.
 - Configurable API base via `VITE_API_BASE` (defaults to `http://localhost:5000`).
 
 ## Next steps
