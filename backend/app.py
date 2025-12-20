@@ -39,17 +39,9 @@ logging.basicConfig(level=logging.INFO)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
-    default_limits=["200 per hour"],
-)
-
-
 def _init_redis(url: str):
     try:
-        client = redis.from_url(url, decode_responses=True)
+        client = redis.from_url(url, decode_responses=True, ssl_cert_reqs=None)
         client.ping()
         app.logger.info("Redis connected")
         return client
@@ -79,6 +71,14 @@ if _openai_api_key:
         app.logger.error("OpenAI initialization error: %s", exc)
 
 redis_client = _init_redis(app.config["REDIS_URL"])
+
+limiter_storage = app.config["RATELIMIT_STORAGE_URI"] if redis_client else "memory://"
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri=limiter_storage,
+    default_limits=["200 per hour"],
+)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
