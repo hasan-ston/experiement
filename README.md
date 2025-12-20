@@ -32,6 +32,9 @@ Learned the difference between full table scans and indexed queries. Without pro
 ### Network Latency vs Server Performance
 The round-trip network latency typically dominates total response time. While backend optimizations like caching don't reduce network RTT, they dramatically improve server throughput and reduce database load, allowing the system to handle significantly more concurrent requests.
 
+### CORS (Cross-Origin Resource Sharing)
+Had to configure CORS in Flask to allow my React frontend (hosted on Vercel at a different domain) to call my Flask API (hosted on Render). Without CORS headers, browsers block these cross-origin requests as a security measure. Basically, when your frontend and backend are on different domains, you need to explicitly tell the browser "yes, this cross-origin communication is intentional and allowed."
+
 ### JWT vs Session-Based Authentication
 Most beginner tutorials use session-based auth, but I implemented JWTs after learning about their scaling advantages:
 
