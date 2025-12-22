@@ -61,7 +61,7 @@ _gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if _gemini_api_key:
     try:
         genai.configure(api_key=_gemini_api_key)
-        gemini_model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        gemini_model = genai.GenerativeModel("gemini-1.5-flash")
         app.logger.info("Gemini AI initialized")
     except Exception as exc:
         app.logger.error("Gemini initialization error: %s", exc)
